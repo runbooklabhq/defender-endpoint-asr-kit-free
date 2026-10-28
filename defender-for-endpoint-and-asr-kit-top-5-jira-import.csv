@@ -1,0 +1,104 @@
+Issue ID,Issue Type,Summary,Description,Priority,Parent,Sprint,Labels
+1,Epic,Defender for Endpoint and ASR Kit: Onboarding and antivirus baseline,Defender for Endpoint and ASR Kit - Top 5,High,,,defender-endpoint
+2,Epic,Defender for Endpoint and ASR Kit: Attack surface reduction,Defender for Endpoint and ASR Kit - Top 5,High,,,defender-endpoint
+3,Epic,Defender for Endpoint and ASR Kit: Network and web protection,Defender for Endpoint and ASR Kit - Top 5,High,,,defender-endpoint
+4,Story,[DE01] Check every device is onboarded and its sensor is healthy,"Why: A device that is not onboarded, or whose sensor stopped reporting, is invisible to Defender: no alerts, no ASR reports, no response actions. Microsoft calls out impaired communications and missing sensor data as risks that warrant investigation.
+
+Steps:
+# Microsoft Defender portal > Reports > Device health and compliance > Sensor health & OS: filter on Inactive, Impaired communications and No sensor data. Export the list.
+# Compare the device count with Intune (or your CMDB): every Windows device you manage should appear in Defender.
+# On a sample device, run the read-only check: the Sense service should be Running and the onboarding status should be 1.
+# Fix each gap (re-run the onboarding package or Intune onboarding policy) and record it in the tracker.
+
+Impact: None. Reports and the check only read data.
+Rollback: Nothing to roll back.
+
+Check (read-only):
+{code:powershell}
+Get-Service -Name Sense | Select-Object Name, Status, StartType | Format-List | Out-String; $s = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows Advanced Threat Protection\Status' -ErrorAction SilentlyContinue; ""OnboardingState (1 = onboarded): $($s.OnboardingState)""
+{code}
+
+Verify: No managed Windows device is missing from Defender or shows Inactive / Impaired communications / No sensor data for more than 7 days.
+Licence: Microsoft Defender for Endpoint Plan 1 or Plan 2, or Defender for Business. Sensor health report: View Data permission under TVM.
+Effort: 1 h
+Microsoft Learn: https://learn.microsoft.com/en-us/defender-endpoint/device-health-sensor-health-os https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-onboarding",Highest,1,Sprint 1 - Endpoint baseline,defender-endpoint sprint-1
+5,Story,[DE02] Make sure Defender Antivirus is active with cloud protection and block at first sight,"Why: ASR rules, network protection and indicators only work when Defender Antivirus runs in active mode. Block at first sight, which Microsoft says can cut the response time for new malware from hours to seconds, needs cloud protection on and samples sent automatically.
+
+Steps:
+# Intune > Endpoint security > Antivirus > Create policy > Windows > Microsoft Defender Antivirus: Allow cloud protection = Allowed; Submit samples consent = Send safe samples automatically (or all samples).
+# Keep real-time protection on and don't disable block at first sight.
+# Assign to all Windows devices.
+# Run the read-only check on sample devices: AMRunningMode should be Normal (active), MAPSReporting 2, SubmitSamplesConsent 1 or 3, DisableBlockAtFirstSeen False.
+
+Impact: Files new to Microsoft can be held for a cloud check before they run. Microsoft says 'Never send' for samples stops block at first sight from working.
+Rollback: Change the Antivirus policy settings back in Intune.
+
+Check (read-only):
+{code:powershell}
+Get-MpComputerStatus | Select-Object AMRunningMode, RealTimeProtectionEnabled, AMProductVersion, AntivirusSignatureLastUpdated | Format-List | Out-String; Get-MpPreference | Select-Object MAPSReporting, SubmitSamplesConsent, DisableBlockAtFirstSeen | Format-List | Out-String
+{code}
+
+Verify: Sample devices report active mode, real-time protection on, MAPSReporting 2, automatic sample submission and block at first sight not disabled.
+Licence: Microsoft Defender Antivirus (Windows); management through Intune or another tool. Defender for Endpoint Plan 1/2 or Defender for Business for central reporting.
+Effort: 1 h
+Microsoft Learn: https://learn.microsoft.com/en-us/defender-endpoint/configure-block-at-first-sight-microsoft-defender-antivirus https://learn.microsoft.com/en-us/defender-endpoint/edr-in-block-mode",Highest,1,Sprint 1 - Endpoint baseline,defender-endpoint sprint-1
+6,Story,[DE03] Turn on tamper protection tenant-wide,"Why: Attackers who reach admin rights try to switch off real-time protection or add exclusions first. With tamper protection on, those settings can't be changed on the device, and exclusions can't be added or modified locally.
+
+Steps:
+# Microsoft Defender portal > Settings > Endpoints > Advanced features: turn on Tamper protection for the tenant (or use Intune for selected devices).
+# Run the read-only check on sample devices: IsTamperProtected should be True.
+# Tell the desktop team: changes to protected settings may appear to succeed but are silently blocked; use troubleshooting mode for legitimate changes.
+# Note: Microsoft is renaming tamper protection to controlled configuration in management experiences, with no change in behaviour.
+
+Impact: Local and Group Policy changes to protected antivirus settings and exclusions are ignored. Changes must come from your management tool or troubleshooting mode.
+Rollback: Turn tamper protection off in the portal or exclude a device in Intune (this lowers protection; prefer troubleshooting mode).
+
+Check (read-only):
+{code:powershell}
+Get-MpComputerStatus | Select-Object IsTamperProtected, RealTimeProtectionEnabled | Format-List
+{code}
+
+Verify: IsTamperProtected is True on sample devices of every type.
+Licence: Defender for Endpoint Plan 1/2, Defender for Business or Microsoft Defender Antivirus (per Learn 'Applies to').
+Effort: 30 min
+Microsoft Learn: https://learn.microsoft.com/en-us/defender-endpoint/prevent-changes-to-security-settings-with-tamper-protection",Highest,1,Sprint 1 - Endpoint baseline,defender-endpoint sprint-1
+7,Story,[DE04] Put all ASR rules in Audit and block the three standard protection rules,"Why: Attack surface reduction rules stop Office macros, scripts and credential theft before they run. Turned on in Block all at once they also stop legitimate tools. Microsoft groups three rules as standard protection; the rest should run in Audit first so you see what would break.
+
+Steps:
+# Intune > Endpoint security > Attack surface reduction > create an Attack Surface Reduction Rules policy: all rules on Audit, assigned to all Windows devices.
+# In the same policy set the three standard protection rules to Block: abuse of exploited vulnerable signed drivers (56a863a9-875e-4185-98a7-b882c64b5ce5), credential stealing from LSASS (9e6c4e1f-7d60-472f-ba1a-a39ef669e4b2), persistence through WMI event subscription (e6db77e5-3df2-4cf1-b95a-636979351e5b). Audit them for a week first if you run unusual management tools.
+# Leave the rest in Audit for 2-4 weeks so month-end jobs show up too.
+# Run the read-only check on sample devices to confirm the policy arrived (actions: 0 off, 1 Block, 2 Audit, 6 Warn).
+
+Impact: Audit has no user impact. Block on the standard rules rarely affects business apps but can block old drivers or management tools that use WMI persistence. If LSA protection is on, the LSASS rule adds nothing extra.
+Rollback: Set the rule back to Audit or Not configured in the Intune policy.
+
+Check (read-only):
+{code:powershell}
+$p = Get-MpPreference; $ids = @($p.AttackSurfaceReductionRules_Ids); $act = @($p.AttackSurfaceReductionRules_Actions); ""ASR rules configured: $($ids.Count)""; for ($i = 0; $i -lt $ids.Count; $i++) { ""$($ids[$i]) = $($act[$i])"" }
+{code}
+
+Verify: Every Windows device reports all ASR rules in Audit (2) and the three standard protection rules in Block (1).
+Licence: Defender for Endpoint Plan 1/2 or Defender for Business. Advanced hunting for audit events: Plan 2 / E5.
+Effort: 2 h + 2-4 weeks audit
+Microsoft Learn: https://learn.microsoft.com/en-us/defender-endpoint/attack-surface-reduction-rules-reference",High,2,Sprint 1 - Endpoint baseline,defender-endpoint sprint-1
+8,Story,"[DE05] Turn on network protection (audit, then block)","Why: Network protection stops apps, not just browsers, from connecting to domains that host phishing, exploits and malware. It is also a prerequisite for web content filtering and indicators in browsers other than Edge.
+
+Steps:
+# Intune > Endpoint security > Antivirus > Microsoft Defender Antivirus policy: Enable network protection = Enabled (audit mode) for two weeks.
+# Review blocked-in-audit connections with the security team.
+# Switch to Enabled (block mode).
+# Windows Server: network protection is opt-in (AllowNetworkProtectionOnWinServer); on DNS, file servers and domain controllers set AllowDatagramProcessingOnWinServer to false.
+
+Impact: Block mode stops connections to malicious or suspicious domains for every app on the device. Users see a notification.
+Rollback: Set Enable network protection back to audit mode or Disabled.
+
+Check (read-only):
+{code:powershell}
+Get-MpPreference | Select-Object EnableNetworkProtection | Format-List | Out-String; '0 = off, 1 = block, 2 = audit'
+{code}
+
+Verify: EnableNetworkProtection is 1 (block) on sample devices after the audit period.
+Licence: Defender for Endpoint Plan 1/2 (Defender Antivirus active mode with real-time, behaviour monitoring and cloud protection on). Windows 10 1709+ / Windows 11 Pro or Enterprise.
+Effort: 1 h + 2 weeks audit
+Microsoft Learn: https://learn.microsoft.com/en-us/defender-endpoint/enable-network-protection",High,3,Sprint 1 - Endpoint baseline,defender-endpoint sprint-1
