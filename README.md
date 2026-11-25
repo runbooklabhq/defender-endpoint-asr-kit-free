@@ -1,5 +1,9 @@
 # Defender for Endpoint and ASR Kit: Top 5 (free)
 
+[![Defender for Endpoint and ASR Kit: Top 5 (free)](assets/cover.png)](https://runbooklabhq.com/kits/defender-endpoint-asr/)
+
+**[Every control on the kit page](https://runbooklabhq.com/kits/defender-endpoint-asr/)** · [Microsoft 365 deadline calendar](https://runbooklabhq.com/guides/deadlines/) · [Runbook Lab](https://runbooklabhq.com/)
+
 Defender for Endpoint only protects a Windows device when five things are true: the device is onboarded and reporting, Defender Antivirus runs in active mode with cloud protection, tamper protection stops attackers switching it off, attack surface reduction (ASR) rules are rolled out, and network protection blocks bad domains. This kit checks those five and turns them into a project.
 
 | File | What it is |
